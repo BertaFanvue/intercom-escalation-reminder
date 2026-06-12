@@ -3,12 +3,20 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  console.log('Full payload:', JSON.stringify(req.body, null, 2));
+
   const topic = req.body?.topic;
   const tag = req.body?.data?.item?.tag?.name;
   const conversationId = req.body?.data?.item?.conversation_id;
   const assignedAgentId = req.body?.data?.item?.conversation?.assignee?.id;
 
+  console.log('Topic:', topic);
+  console.log('Tag:', tag);
+  console.log('Conversation ID:', conversationId);
+  console.log('Assigned Agent ID:', assignedAgentId);
+
   if (topic !== 'conversation_part.tag.created' || tag !== 'Escalated') {
+    console.log('Filter did not match, ignoring');
     return res.status(200).json({ message: 'Ignored' });
   }
 
