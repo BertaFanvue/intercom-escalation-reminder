@@ -35,14 +35,13 @@ export default async function handler(req, res) {
     return res.status(200).json({ message: 'Not escalated, ignored' });
   }
 
-  const assignedAgentId = conversation?.assignee?.id;
+  const assignedAgentId = conversation?.assignee?.id || conversation?.admin_assignee_id;
   console.log('Assigned Agent ID:', assignedAgentId);
+  console.log('Full assignee:', JSON.stringify(conversation?.assignee));
 
-  const noteBody = assignedAgentId
-    ? `<p>Reminder: this case has been escalated. Please add a note with the link to the external escalation ticket.</p><p><mention id="${assignedAgentId}"></mention></p>`
-    : `<p>Reminder: this case has been escalated. Please add a note with the link to the external escalation ticket.</p>`;
+  const noteBody = `<p>Reminder: this case has been escalated. Please add a note with the link to the external escalation ticket.</p>`;
 
-  const noteResponse = await fetch(`https://api.intercom.io/conversations/${conversationId}/reply`, {
+  const noteResponse = await fetch(`https://api.intercom.io/conversations/${conversationId}/parts`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.INTERCOM_API_TOKEN}`,
