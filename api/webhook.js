@@ -41,7 +41,21 @@ export default async function handler(req, res) {
 
   const noteBody = `<p>Reminder: this case has been escalated. Please add a note with the link to the external escalation ticket.</p>`;
 
-  const noteResponse = await fetch(`https://api.intercom.io/conversations/${conversationId}/parts`, {
+  // First reopen the conversation so we can post a note
+  await fetch(`https://api.intercom.io/conversations/${conversationId}/open`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${process.env.INTERCOM_API_TOKEN}`,
+      'Content-Type': 'application/json',
+      'Intercom-Version': '2.10'
+    },
+    body: JSON.stringify({
+      type: 'admin',
+      admin_id: process.env.INTERCOM_ADMIN_ID
+    })
+  });
+
+  const noteResponse = await fetch(`https://api.intercom.io/conversations/${conversationId}/reply`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.INTERCOM_API_TOKEN}`,
