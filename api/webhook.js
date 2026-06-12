@@ -3,28 +3,46 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  console.log('Full payload:', JSON.stringify(req.body, null, 2));
-
   const topic = req.body?.topic;
-  const tag = req.body?.data?.item?.tag?.name;
-  const conversationId = req.body?.data?.item?.conversation_id;
-  const assignedAgentId = req.body?.data?.item?.conversation?.assignee?.id;
+  const conversationId = req.body?.data?.item?.id;
 
   console.log('Topic:', topic);
-  console.log('Tag:', tag);
   console.log('Conversation ID:', conversationId);
-  console.log('Assigned Agent ID:', assignedAgentId);
 
-  if (topic !== 'conversation_part.tag.created' || tag !== 'Escalated') {
-    console.log('Filter did not match, ignoring');
+  if (topic !== 'conversation.admin.closed') {
+    console.log('Not a close event, ignoring');
     return res.status(200).json({ message: 'Ignored' });
   }
+
+  // Fetch the full conversation to check tags
+  const convResponse = await fetch(`https://api.intercom.io/conversations/${conversationId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${process.env.INTERCOM_API_TOKEN}`,
+      'Content-Type': 'application/json',
+      'Intercom-Version': '2.10'
+    }
+  });
+
+  const conversation = await convResponse.json();
+  console.log('Tags:', JSON.stringify(conversation.tags));
+
+  const tags = conversation?.tags?.tags || [];
+  const isEscalated = tags.some(tag => tag.name === 'Escalated');
+
+  if (!isEscalated) {
+    console.log('No Escalated tag found, ignoring');
+    return res.status(200).json({ message: 'Not escalated, ignored' });
+  }
+
+  const assignedAgentId = conversation?.assignee?.id;
+  console.log('Assigned Agent ID:', assignedAgentId);
 
   const noteBody = assignedAgentId
     ? `<p>Reminder: this case has been escalated. Please add a note with the link to the external escalation ticket.</p><p><mention id="${assignedAgentId}"></mention></p>`
     : `<p>Reminder: this case has been escalated. Please add a note with the link to the external escalation ticket.</p>`;
 
-  const response = await fetch(`https://api.intercom.io/conversations/${conversationId}/reply`, {
+  const noteResponse = await fetch(`https://api.intercom.io/conversations/${conversationId}/reply`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.INTERCOM_API_TOKEN}`,
@@ -39,11 +57,12 @@ export default async function handler(req, res) {
     })
   });
 
-  if (!response.ok) {
-    const error = await response.json();
+  if (!noteResponse.ok) {
+    const error = await noteResponse.json();
     console.error('Intercom API error:', error);
     return res.status(500).json({ message: 'Failed to post note', error });
   }
 
+  console.log('Note posted successfully');
   return res.status(200).json({ message: 'Note posted successfully' });
 }
