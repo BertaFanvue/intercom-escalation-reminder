@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   const conversationId = req.body?.data?.item?.conversation_id;
   const assignedAgentId = req.body?.data?.item?.conversation?.assignee?.id;
 
-  if (topic !== 'conversation_tag.created' || tag !== 'Escalated') {
+  if (topic !== 'conversation_part.tag.created' || tag !== 'Escalated') {
     return res.status(200).json({ message: 'Ignored' });
   }
 
