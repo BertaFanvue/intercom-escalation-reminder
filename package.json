@@ -1,0 +1,6 @@
+{
+  "name": "intercom-escalation-reminder",
+  "version": "1.0.0",
+  "description": "Webhook to post internal note reminder when Escalated tag is added in Intercom",
+  "private": true
+}
