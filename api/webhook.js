@@ -26,6 +26,7 @@ export default async function handler(req, res) {
 
   const conversation = await convResponse.json();
   console.log('Tags:', JSON.stringify(conversation.tags));
+  console.log('Conversation state:', conversation.state);
 
   const tags = conversation?.tags?.tags || [];
   const isEscalated = tags.some(tag => tag.name === 'Escalated');
@@ -37,11 +38,11 @@ export default async function handler(req, res) {
 
   const assignedAgentId = conversation?.assignee?.id || conversation?.admin_assignee_id;
   console.log('Assigned Agent ID:', assignedAgentId);
-  console.log('Full assignee:', JSON.stringify(conversation?.assignee));
 
+  const adminId = process.env.INTERCOM_ADMIN_ID;
   const noteBody = `<p>Reminder: this case has been escalated. Please add a note with the link to the external escalation ticket.</p>`;
 
-  // First reopen the conversation so we can post a note
+  // Reopen the conversation first
   const reopenResponse = await fetch(`https://api.intercom.io/conversations/${conversationId}/parts`, {
     method: 'POST',
     headers: {
@@ -52,14 +53,21 @@ export default async function handler(req, res) {
     body: JSON.stringify({
       message_type: 'open',
       type: 'admin',
-      admin_id: process.env.INTERCOM_ADMIN_ID
+      admin_id: adminId
     })
   });
+
   console.log('Reopen status:', reopenResponse.status);
   const reopenData = await reopenResponse.json();
   console.log('Reopen response:', JSON.stringify(reopenData));
 
-  const noteResponse = await fetch(`https://api.intercom.io/conversations/${conversationId}/reply`, {
+  if (!reopenResponse.ok) {
+    console.error('Failed to reopen conversation');
+    return res.status(500).json({ message: 'Failed to reopen conversation', error: reopenData });
+  }
+
+  // Post the internal note
+  const noteResponse = await fetch(`https://api.intercom.io/conversations/${conversationId}/parts`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.INTERCOM_API_TOKEN}`,
@@ -69,15 +77,17 @@ export default async function handler(req, res) {
     body: JSON.stringify({
       message_type: 'note',
       type: 'admin',
-      admin_id: process.env.INTERCOM_ADMIN_ID,
+      admin_id: adminId,
       body: noteBody
     })
   });
 
+  const noteData = await noteResponse.json();
+  console.log('Note response:', JSON.stringify(noteData));
+
   if (!noteResponse.ok) {
-    const error = await noteResponse.json();
-    console.error('Intercom API error:', error);
-    return res.status(500).json({ message: 'Failed to post note', error });
+    console.error('Intercom API error:', noteData);
+    return res.status(500).json({ message: 'Failed to post note', error: noteData });
   }
 
   console.log('Note posted successfully');
